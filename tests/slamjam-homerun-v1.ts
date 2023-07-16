@@ -10,11 +10,6 @@ describe("slamjam-homerun-v1", () => {
 
   const program = anchor.workspace.SlamjamHomerunV1 as Program<SlamjamHomerunV1>;
 
-  const [roundCounterPDA] = anchor.web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("round-counter")],
-    program.programId
-  )
-
   const [roundPDA] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("round")],
     program.programId
