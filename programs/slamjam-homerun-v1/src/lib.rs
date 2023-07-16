@@ -5,6 +5,14 @@ declare_id!("7rxVoKkHEj63EVcKi4gC3utmgs1D4chGP7HzQneMuyKV");
 #[program]
 pub mod slamjam_homerun_v1 {
     use super::*;
+    
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        msg!("Iinitializing Round Counter");
+        let round_counter = &mut ctx.accounts.round_counter;
+        round_counter.round = 1;
+        Ok(())
+    }
+
 }
 
 #[account]
@@ -15,9 +23,6 @@ pub struct RoundCounter {
 
 #[account]
 pub struct Round {
-    // Who claimed the round
-    claimer: Pubkey, // 32
-
     // Winner of the round
     winner: Pubkey, // 32
 
@@ -27,4 +32,19 @@ pub struct Round {
     // Play until deadline. Winner claims until 2 * deadline (grace period).
     // After grace period, anyone can claim.
     deadline: u32, // 4
+}
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(
+        init, 
+        seeds = [b"round-counter"],
+        bump,
+        payer = initializer, 
+        space = 8 + 4
+    )]
+    pub round_counter: Account<'info, RoundCounter>,
+    #[account(mut)]
+    pub initializer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
