@@ -22,37 +22,6 @@ describe("slamjam-homerun-v1", () => {
 
   describe("Test Suite", () => {
 
-    it("Shouldn't fetch Round Counter before calling initialize", async () => {
-      try {
-        await program.account.roundCounter.fetch(roundCounterPDA);
-      } catch (error) {
-        assert.strictEqual(error.message, 'Account does not exist or has no data FBRqoYDyLR3ugaGQjmeJh9Jimxc2rtNoQ2FNdavdKuAg');
-      }
-    })
-
-    it("Should initialize Round Counter gracefully", async () => {
-      const tx = await program.methods
-        .initialize()
-        .accounts({ roundCounter: roundCounterPDA })
-        .rpc()
-
-      const roundCounter = await program.account.roundCounter.fetch(roundCounterPDA)
-
-      expect(roundCounter.round).to.be.equal(1);
-    })
-
-    it("Shouldn't let Round Counter be initialized twice", async () => {
-      try {
-        const tx = await program.methods
-          .initialize()
-          .accounts({ roundCounter: roundCounterPDA })
-          .rpc()
-      } catch (error) {
-        assert.strictEqual(error.message, 'failed to send transaction: Transaction simulation failed: Error processing Instruction 0: custom program error: 0x0');
-      }
-
-    })
-
     it("Shouldn't fetch Round before calling play", async () => {
       try {
         await program.account.round.fetch(roundPDA);
@@ -74,7 +43,7 @@ describe("slamjam-homerun-v1", () => {
       expect(round.winner.toBase58()).to.be.equal(new anchor.web3.PublicKey(0).toBase58())
     })
 
-    it("Should be able to fetch round after it is created", async () => {
+    it("Should be able to fetch Round after it is created", async () => {
       await program.account.round.fetch(roundPDA);
     })
 
