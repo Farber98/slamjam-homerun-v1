@@ -8,6 +8,13 @@ pub mod slamjam_homerun_v1 {
     
     pub fn play(ctx: Context<Play>) -> Result<()> {
         msg!("Play called");
+        
+        // If round was created in this transaction, deadline must be set.
+        let round = &mut ctx.accounts.round;
+        if round.deadline == 0 {
+            round.deadline = Clock::get()?.unix_timestamp.checked_add(3600).unwrap();
+        }
+
         Ok(())
     }
 
@@ -23,7 +30,7 @@ pub struct Round {
 
     // Play until deadline. Winner claims until 2 * deadline (grace period).
     // After grace period, anyone can claim.
-    deadline: u32, // 4
+    deadline: i64, // 8
 }
 
 #[derive(Accounts)]
@@ -33,7 +40,7 @@ pub struct Play<'info> {
         seeds = [b"round"],
         bump,
         payer = player, 
-        space = 8 + 38
+        space = 8 + 32 + 2 + 8
     )]
     pub round: Account<'info, Round>,
     #[account(mut)]

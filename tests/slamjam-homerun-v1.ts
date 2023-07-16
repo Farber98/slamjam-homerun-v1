@@ -2,6 +2,9 @@ import * as anchor from "@project-serum/anchor"
 import { Program } from "@project-serum/anchor"
 import { assert, expect } from "chai"
 import { SlamjamHomerunV1 } from "../target/types/slamjam_homerun_v1";
+import { BN } from "bn.js";
+import { setTimeout } from "timers/promises";
+
 
 describe("slamjam-homerun-v1", () => {
   // Configure the client to use the local cluster.
@@ -33,12 +36,24 @@ describe("slamjam-homerun-v1", () => {
 
       const round = await program.account.round.fetch(roundPDA)
 
-      expect(round.deadline).to.be.equal(0)
+      const deadlineToDate = new Date(round.deadline.toNumber() * 1000)
+      const currentTimestamp = new Date()
+      const HOUR = 59 * 60 * 1000
+      const currentTimestampPlusHour = new Date(currentTimestamp.setTime(currentTimestamp.getTime() + HOUR))
+
+      expect(deadlineToDate).to.be.gte(currentTimestampPlusHour)
       expect(round.score).to.be.equal(0)
       expect(round.winner.toBase58()).to.be.equal(new anchor.web3.PublicKey(0).toBase58())
     })
 
     it("Should be able to fetch Round after it is created", async () => {
+      await program.account.round.fetch(roundPDA);
+    })
+
+    it("Should transfer fee from sender to pool", async () => {
+    })
+
+    it("Shouldn't be able to play when deadline is exceeded", async () => {
       await program.account.round.fetch(roundPDA);
     })
 
