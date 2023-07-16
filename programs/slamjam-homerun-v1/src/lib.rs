@@ -13,6 +13,11 @@ pub mod slamjam_homerun_v1 {
         Ok(())
     }
 
+    pub fn play(ctx: Context<Play>) -> Result<()> {
+        msg!("Play called");
+        Ok(())
+    }
+
 }
 
 #[account]
@@ -46,5 +51,20 @@ pub struct Initialize<'info> {
     pub round_counter: Account<'info, RoundCounter>,
     #[account(mut)]
     pub initializer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Play<'info> {
+    #[account(
+        init_if_needed, 
+        seeds = [b"round"],
+        bump,
+        payer = player, 
+        space = 8 + 38
+    )]
+    pub round: Account<'info, Round>,
+    #[account(mut)]
+    pub player: Signer<'info>,
     pub system_program: Program<'info, System>,
 }

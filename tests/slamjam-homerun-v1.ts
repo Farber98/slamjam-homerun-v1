@@ -15,6 +15,11 @@ describe("slamjam-homerun-v1", () => {
     program.programId
   )
 
+  const [roundPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("round")],
+    program.programId
+  )
+
   describe("Test Suite", () => {
 
     it("Shouldn't fetch Round Counter before calling initialize", async () => {
@@ -47,6 +52,32 @@ describe("slamjam-homerun-v1", () => {
       }
 
     })
-  })
 
-});
+    it("Shouldn't fetch Round before calling play", async () => {
+      try {
+        await program.account.round.fetch(roundPDA);
+      } catch (error) {
+        assert.strictEqual(error.message, 'Account does not exist or has no data H6kqNVWXv1pTxSTn3dEtZ52nZpAHTAi95hS84owEeaaZ');
+      }
+    })
+
+    it("Should create Round gracefully", async () => {
+      const tx = await program.methods
+        .play()
+        .accounts({ round: roundPDA })
+        .rpc()
+
+      const round = await program.account.round.fetch(roundPDA)
+
+      expect(round.deadline).to.be.equal(0)
+      expect(round.score).to.be.equal(0)
+      expect(round.winner.toBase58()).to.be.equal(new anchor.web3.PublicKey(0).toBase58())
+    })
+
+    it("Should be able to fetch round after it is created", async () => {
+      await program.account.round.fetch(roundPDA);
+    })
+
+  })
+})
+
