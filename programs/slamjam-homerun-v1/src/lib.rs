@@ -4,6 +4,7 @@ use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 
 declare_id!("7rxVoKkHEj63EVcKi4gC3utmgs1D4chGP7HzQneMuyKV");
 const FEE: u64 = 1 * LAMPORTS_PER_SOL;
+const ROUND_TIME_IN_SECONDS: i64 = 3600;
 
 #[program]
 pub mod slamjam_homerun_v1 {
@@ -11,16 +12,17 @@ pub mod slamjam_homerun_v1 {
     use super::*;
     
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-         // If round was created in this transaction, deadline must be set.
+        // Initialize round and sets admin
         let round = &mut ctx.accounts.round;
         round.initialized = true;
+        round.admin = ctx.accounts.initializer.key();
         Ok(())
     } 
 
     pub fn play(ctx: Context<Play>) -> Result<()> {
         let round = &mut ctx.accounts.round;
         
-        let timestamp = Clock::get()?.unix_timestamp.checked_add(3600).unwrap();
+        let timestamp = Clock::get()?.unix_timestamp.checked_add(ROUND_TIME_IN_SECONDS).unwrap();
 
         // If round has no deadline, deadline must be set.
         if round.deadline == 0 {
@@ -42,8 +44,71 @@ pub mod slamjam_homerun_v1 {
         // Transfers SOL from player to pool
         system_program::transfer(cpi_context, FEE)?;
         
-        round.pool += FEE;
+        round.pool = round.pool.checked_add(FEE).unwrap();
 
+        Ok(())
+    }
+    
+    pub fn score(ctx: Context<Score>, score: u16) -> Result<()> {
+        let round = &mut ctx.accounts.round;
+        
+        let timestamp = Clock::get()?.unix_timestamp.checked_add(ROUND_TIME_IN_SECONDS).unwrap();
+
+        // If timestamp > round.deadline, it's claiming phase.
+        require!(round.deadline >= timestamp, Errors::PlayInClaimingPhase);
+        
+        // If it's a new highest score, update score and winner.
+        if score > round.score {
+            round.score = score; 
+            round.winner = ctx.accounts.player.key(); 
+        }
+
+        Ok(())
+    }
+    
+    pub fn claim(ctx: Context<Claim>) -> Result<()> {
+        let round = &mut ctx.accounts.round;
+        let player = ctx.accounts.player.to_account_info();
+
+        let timestamp = Clock::get()?.unix_timestamp.checked_add(ROUND_TIME_IN_SECONDS).unwrap();
+
+        // If timestamp > round.deadline, it's claiming phase.
+        require!(round.deadline <= timestamp, Errors::ClaimInPlayingPhase);
+        
+        // Checking that only winner can claim inside grace period        
+        // If we are inside grace period
+        if timestamp <= round.deadline.checked_mul(2).unwrap() {
+            // Only the winner can claim
+            require_keys_eq!(player.key(), round.winner, Errors::NotWinnerInGracePeriod);
+        }
+
+        // Anyone can claim after grace period (timestamp > 2 * round.deadline)
+
+        // Creates context for transfer CPI.
+        let cpi_context = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(), 
+            system_program::Transfer {
+                from: round.to_account_info(),
+                to: player,
+            });
+
+        // Reentrancy is posible here? Idk but lets avoid risks :P
+        let transfer_amount = round.pool;
+        round.pool = 0;
+
+        // Transfers pool to player
+        system_program::transfer(cpi_context, transfer_amount)?;
+
+        // Set deadline to zero so next play() caller sets new deadline.
+        round.deadline = 0;
+
+        Ok(())
+    }
+
+    pub fn kill(ctx: Context<Kill>) -> Result<()> {
+        // Admins will be able to close PDA to recover rent and fees.
+        // This will end v1 program.
+        require_eq!(ctx.accounts.round.winner, ctx.accounts.admin.key(), Errors::NotAdminKilling);
         Ok(())
     }
 
@@ -53,6 +118,9 @@ pub mod slamjam_homerun_v1 {
 pub struct Round {
     // Winner of the round
     initialized: bool, // 1
+
+    // Admin of the round
+    admin: Pubkey, // 32
 
     // Winner of the round
     winner: Pubkey, // 32
@@ -72,6 +140,9 @@ pub struct Round {
 #[error_code]
 pub enum Errors {
     PlayInClaimingPhase,
+    ClaimInPlayingPhase,
+    NotWinnerInGracePeriod,
+    NotAdminKilling,
 }
 
 #[derive(Accounts)]
@@ -81,7 +152,7 @@ pub struct Initialize<'info> {
         seeds = [b"round"],
         bump,
         payer = initializer, 
-        space = 8 + 1 + 32 + 2 + 8 + 8,
+        space = 8 + 1 + 32 + 32 + 2 + 8 + 8,
         constraint = !round.initialized
     )]
     pub round: Account<'info, Round>,
@@ -96,9 +167,53 @@ pub struct Play<'info> {
         mut, 
         seeds = [b"round"],
         bump,
+        constraint = round.initialized
     )]
     pub round: Account<'info, Round>,
     #[account(mut)]
     pub player: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Score<'info> {
+    #[account(
+        mut, 
+        seeds = [b"round"],
+        bump,
+        constraint = round.initialized
+    )]
+    pub round: Account<'info, Round>,
+    #[account()]
+    pub player: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct Claim<'info> {
+    #[account(
+        mut, 
+        seeds = [b"round"],
+        bump,
+        constraint = round.initialized
+    )]
+    pub round: Account<'info, Round>,
+    #[account()]
+    pub player: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+
+#[derive(Accounts)]
+pub struct Kill<'info> {
+    #[account(
+        mut, 
+        seeds = [b"round"],
+        bump,
+        constraint = round.initialized,
+        close = admin,
+    )]
+    pub round: Account<'info, Round>,
+    #[account()]
+    pub admin: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
