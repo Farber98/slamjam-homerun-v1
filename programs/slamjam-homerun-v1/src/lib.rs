@@ -4,7 +4,7 @@ use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 
 declare_id!("7rxVoKkHEj63EVcKi4gC3utmgs1D4chGP7HzQneMuyKV");
 const FEE: u64 = 1 * LAMPORTS_PER_SOL;
-const ROUND_TIME_IN_SECONDS: i64 = 3600;
+const ROUND_TIME_IN_SECONDS: i64 = /* 3600 */ 3;
 
 #[program]
 pub mod slamjam_homerun_v1 {
@@ -139,7 +139,11 @@ pub struct Round {
 // An enum for custom error codes
 #[error_code]
 pub enum Errors {
+    #[msg("Round already initialized")]
+    RoundAlreadyInitialized,
+    #[msg("Not in playing phase")]
     PlayInClaimingPhase,
+    #[msg("Not in claiming phase")]
     ClaimInPlayingPhase,
     NotWinnerInGracePeriod,
     NotAdminKilling,
@@ -153,7 +157,7 @@ pub struct Initialize<'info> {
         bump,
         payer = initializer, 
         space = 8 + 1 + 32 + 32 + 2 + 8 + 8,
-        constraint = !round.initialized
+        constraint = !round.initialized @ Errors::RoundAlreadyInitialized
     )]
     pub round: Account<'info, Round>,
     #[account(mut)]
@@ -167,7 +171,6 @@ pub struct Play<'info> {
         mut, 
         seeds = [b"round"],
         bump,
-        constraint = round.initialized
     )]
     pub round: Account<'info, Round>,
     #[account(mut)]
@@ -181,7 +184,6 @@ pub struct Score<'info> {
         mut, 
         seeds = [b"round"],
         bump,
-        constraint = round.initialized
     )]
     pub round: Account<'info, Round>,
     #[account()]
@@ -194,7 +196,6 @@ pub struct Claim<'info> {
         mut, 
         seeds = [b"round"],
         bump,
-        constraint = round.initialized
     )]
     pub round: Account<'info, Round>,
     #[account()]
@@ -209,7 +210,6 @@ pub struct Kill<'info> {
         mut, 
         seeds = [b"round"],
         bump,
-        constraint = round.initialized,
         close = admin,
     )]
     pub round: Account<'info, Round>,

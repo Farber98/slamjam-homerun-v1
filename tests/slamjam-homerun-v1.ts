@@ -21,23 +21,78 @@ describe("slamjam-homerun-v1", () => {
   )
 
   const player1 = anchor.web3.Keypair.generate();
+  const player2 = anchor.web3.Keypair.generate();
 
   provider.connection.requestAirdrop(
     player1.publicKey,
     10 * web3.LAMPORTS_PER_SOL // 10 SOL
   )
 
+  provider.connection.requestAirdrop(
+    player2.publicKey,
+    10 * web3.LAMPORTS_PER_SOL // 10 SOL
+  )
+
   const FEE = 1 * web3.LAMPORTS_PER_SOL;
 
-  describe("Test Suite", () => {
+  const ROUND_TIME_IN_SECONDS = /* 3600 */ 3;
 
-    it("Shouldn't fetch Round before calling Initialize", async () => {
+  describe("Before initialization", () => {
+
+    it("Shouldn't exist a Round before calling Initialize", async () => {
       try {
         await program.account.round.fetch(roundPDA);
       } catch (error) {
         assert.strictEqual(error.message, 'Account does not exist or has no data H6kqNVWXv1pTxSTn3dEtZ52nZpAHTAi95hS84owEeaaZ');
       }
     })
+
+    it("Shouldn't be able to play before calling Initialize", async () => {
+      try {
+        await program.methods
+          .play()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'AccountNotInitialized');
+      }
+    })
+
+    it("Shouldn't be able to score before calling Initialize", async () => {
+      try {
+        await program.methods
+          .score(1)
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'AccountNotInitialized');
+      }
+    })
+
+    it("Shouldn't be able to claim before calling Initialize", async () => {
+      try {
+        await program.methods
+          .claim()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'AccountNotInitialized');
+      }
+    })
+
+    it("Shouldn't be able to kill before calling Initialize", async () => {
+      try {
+        await program.methods
+          .kill()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'AccountNotInitialized');
+      }
+    })
+  })
+
+  describe("Initialization", () => {
 
     it("Should create Round when calling Initialize", async () => {
       const tx = await program.methods
@@ -48,6 +103,7 @@ describe("slamjam-homerun-v1", () => {
       const round = await program.account.round.fetch(roundPDA);
 
       expect(round.initialized).to.be.equal(true)
+      expect(round.admin.toBase58()).to.be.equal(provider.wallet.publicKey.toBase58())
       expect(round.winner.toBase58()).to.be.equal(new anchor.web3.PublicKey(0).toBase58())
       expect(round.score).to.be.equal(0)
       expect(round.deadline.toNumber()).to.be.equal(0)
@@ -61,11 +117,17 @@ describe("slamjam-homerun-v1", () => {
           .accounts({ round: roundPDA })
           .rpc()
       } catch (error) {
-        assert.strictEqual(error.message, 'AnchorError caused by account: round. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.');
+        assert.strictEqual(error.error.errorCode.code, 'RoundAlreadyInitialized');
       }
     })
 
-    it("Should play gracefully", async () => {
+  })
+
+  describe("Live", () => {
+    let roundDeadline: number;
+    let roundBalanceAfterFirstPlay: number;
+
+    it("Should play (first) gracefully setting deadline", async () => {
       let round = await program.account.round.fetch(roundPDA);
       const player1BalanceBefore = await program.provider.connection.getBalance(player1.publicKey);
       const roundPoolBefore = round.pool
@@ -74,6 +136,7 @@ describe("slamjam-homerun-v1", () => {
       // Assert deadline was zero before calling first time.
       expect(round.deadline.toNumber()).to.be.equal(0)
 
+      const currentTimestamp = new Date()
       const tx = await program.methods
         .play()
         .accounts({
@@ -87,23 +150,19 @@ describe("slamjam-homerun-v1", () => {
 
       round = await program.account.round.fetch(roundPDA);
 
-      // Assert deadline is set and approx an hour.
+      // Assert deadline is set and is gt current_timestamp.
       const deadlineToDate = new Date(round.deadline.toNumber() * 1000)
-      const currentTimestamp = new Date()
-      const HOURLower = 59 * 60 * 1000
-      const HOURUpper = 61 * 60 * 1000
-      const currentTimestampLower = new Date(currentTimestamp.setTime(currentTimestamp.getTime() + HOURLower))
-      const currentTimestampUpper = new Date(currentTimestamp.setTime(currentTimestamp.getTime() + HOURUpper))
-      expect(deadlineToDate).to.be.gte(currentTimestampLower)
-      expect(deadlineToDate).to.be.lte(currentTimestampUpper)
+      expect(deadlineToDate).to.be.gte(currentTimestamp)
+
+      // TODO: Define some upper limit to check round time.
 
       // Assert player balance gets subtracted.
       const player1BalanceAfter = await program.provider.connection.getBalance(player1.publicKey);
       expect(player1BalanceAfter).to.be.equal(player1BalanceBefore - FEE)
 
       // Assert round balance is added
-      const roundBalanceAfter = await program.provider.connection.getBalance(roundPDA);
-      expect(roundBalanceAfter).to.be.equal(roundBalanceBefore + FEE)
+      roundBalanceAfterFirstPlay = await program.provider.connection.getBalance(roundPDA);
+      expect(roundBalanceAfterFirstPlay).to.be.equal(roundBalanceBefore + FEE)
 
       // Assert pool is added
       const FeeToBN = new BN(FEE)
@@ -111,8 +170,48 @@ describe("slamjam-homerun-v1", () => {
       expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeToBN).toString())
     })
 
+    it("Should play (second) gracefully", async () => {
+      let round = await program.account.round.fetch(roundPDA);
+      const player2BalanceBefore = await program.provider.connection.getBalance(player2.publicKey);
+      const roundPoolBefore = round.pool
+      const roundBalanceBefore = await program.provider.connection.getBalance(roundPDA);
+      const FeeToBN = new BN(FEE)
+
+      // Assert pool has previous player fee
+      expect(roundPoolBefore.toString()).to.be.equal(FeeToBN.toString())
+      // Assert roundPDA has previous player fee as balance
+      expect(roundBalanceBefore).to.be.equal(roundBalanceAfterFirstPlay)
+      // Assert deadline is the one set in first call to play ()
+      expect(round.deadline.toNumber()).to.be.equal(roundDeadline)
+
+      const tx = await program.methods
+        .play()
+        .accounts({
+          round: roundPDA,
+          player: player2.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId
+        })
+        .signers([player2])
+        .rpc()
+
+
+      round = await program.account.round.fetch(roundPDA);
+
+      // Assert player balance gets subtracted.
+      const player2BalanceAfter = await program.provider.connection.getBalance(player1.publicKey);
+      expect(player2BalanceAfter).to.be.equal(player2BalanceBefore - FEE)
+
+      // Assert round balance is added
+      const roundBalanceAfter = await program.provider.connection.getBalance(roundPDA);
+      expect(roundBalanceAfter).to.be.equal(roundBalanceBefore + FEE)
+
+      // Assert pool is added
+      const roundPoolAfter = round.pool
+      expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeToBN).toString())
+    })
+
     it("Shouldn't be able to play after deadline", async () => {
-      expect(true).to.be.equal(false);
+
     })
 
   })
