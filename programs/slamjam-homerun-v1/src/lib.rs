@@ -52,10 +52,10 @@ pub mod slamjam_homerun_v1 {
     pub fn score(ctx: Context<Score>, score: u16) -> Result<()> {
         let round = &mut ctx.accounts.round;
         
-        let timestamp = Clock::get()?.unix_timestamp.checked_add(ROUND_TIME_IN_SECONDS).unwrap();
+        let timestamp = Clock::get()?.unix_timestamp;
 
         // If timestamp > round.deadline, it's claiming phase.
-        require!(round.deadline >= timestamp, Errors::PlayInClaimingPhase);
+        require!(round.deadline >= timestamp, Errors::ScoreInClaimingPhase);
         
         // If it's a new highest score, update score and winner.
         if score > round.score {
@@ -143,6 +143,8 @@ pub enum Errors {
     RoundAlreadyInitialized,
     #[msg("Not in playing phase")]
     PlayInClaimingPhase,
+    #[msg("Not in scoring phase")]
+    ScoreInClaimingPhase,
     #[msg("Not in claiming phase")]
     ClaimInPlayingPhase,
     NotWinnerInGracePeriod,

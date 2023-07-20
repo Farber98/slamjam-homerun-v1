@@ -95,7 +95,7 @@ describe("slamjam-homerun-v1", () => {
   describe("Initialization", () => {
 
     it("Should create Round when calling Initialize", async () => {
-      const tx = await program.methods
+      await program.methods
         .initialize()
         .accounts({ round: roundPDA })
         .rpc()
@@ -126,6 +126,8 @@ describe("slamjam-homerun-v1", () => {
   describe("Live", () => {
     let roundDeadlineBN: anchor.BN;
     let roundBalanceAfterFirstPlay: number;
+    const player1Score = 5
+    const player2Score = player1Score + 10
 
     it("Should play (first) gracefully setting deadline", async () => {
       let round = await program.account.round.fetch(roundPDA);
@@ -137,7 +139,7 @@ describe("slamjam-homerun-v1", () => {
       expect(round.deadline.toNumber()).to.be.equal(0)
 
       let currentTimestamp = new Date()
-      const tx = await program.methods
+      await program.methods
         .play()
         .accounts({
           round: roundPDA,
@@ -187,7 +189,7 @@ describe("slamjam-homerun-v1", () => {
       // Assert deadline is the one set in first call to play ()
       expect(round.deadline.toString()).to.be.equal(roundDeadlineBN.toString())
 
-      const tx = await program.methods
+      await program.methods
         .play()
         .accounts({
           round: roundPDA,
@@ -196,7 +198,6 @@ describe("slamjam-homerun-v1", () => {
         })
         .signers([player2])
         .rpc()
-
 
       round = await program.account.round.fetch(roundPDA);
 
@@ -213,6 +214,48 @@ describe("slamjam-homerun-v1", () => {
       expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeToBN).toString())
     })
 
+    it("Should set player 1 as winner", async () => {
+      let round = await program.account.round.fetch(roundPDA);
+
+      expect(round.winner.toBase58()).to.be.equal(new anchor.web3.PublicKey(0).toBase58())
+      expect(round.score).to.be.equal(0)
+
+      await program.methods
+        .score(player1Score)
+        .accounts({
+          round: roundPDA,
+          player: player1.publicKey
+        })
+        .signers([player1])
+        .rpc()
+
+      round = await program.account.round.fetch(roundPDA);
+
+      expect(round.winner.toBase58().toString()).to.be.equal(player1.publicKey.toString())
+      expect(round.score).to.be.equal(player1Score)
+    })
+
+    it("Should set player 2 as winner", async () => {
+      let round = await program.account.round.fetch(roundPDA);
+
+      expect(round.winner.toBase58().toString()).to.be.equal(player1.publicKey.toString())
+      expect(round.score).to.be.equal(player1Score)
+
+      await program.methods
+        .score(player2Score)
+        .accounts({
+          round: roundPDA,
+          player: player2.publicKey
+        })
+        .signers([player2])
+        .rpc()
+
+      round = await program.account.round.fetch(roundPDA);
+
+      expect(round.winner.toBase58().toString()).to.be.equal(player2.publicKey.toString())
+      expect(round.score).to.be.equal(player2Score)
+    })
+
     it("Shouldn't be able to play after deadline", async () => {
       // waits deadline is reached.
       await setTimeout(ROUND_TIME_IN_SECONDS * 1000 / 2)
@@ -224,6 +267,24 @@ describe("slamjam-homerun-v1", () => {
           .rpc()
       } catch (error) {
         assert.strictEqual(error.error.errorCode.code, 'PlayInClaimingPhase');
+      }
+    })
+
+    it("Shouldn't be able to score after deadline", async () => {
+      // waits deadline is reached.
+      await setTimeout(ROUND_TIME_IN_SECONDS * 1000 / 2)
+
+      try {
+        await program.methods
+          .score(player2Score + 10)
+          .accounts({
+            round: roundPDA,
+            player: player1.publicKey
+          })
+          .signers([player1])
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'ScoreInClaimingPhase');
       }
     })
   })
