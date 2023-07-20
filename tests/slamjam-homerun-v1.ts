@@ -124,7 +124,7 @@ describe("slamjam-homerun-v1", () => {
   })
 
   describe("Live", () => {
-    let roundDeadline: number;
+    let roundDeadlineBN: anchor.BN;
     let roundBalanceAfterFirstPlay: number;
 
     it("Should play (first) gracefully setting deadline", async () => {
@@ -136,7 +136,7 @@ describe("slamjam-homerun-v1", () => {
       // Assert deadline was zero before calling first time.
       expect(round.deadline.toNumber()).to.be.equal(0)
 
-      const currentTimestamp = new Date()
+      let currentTimestamp = new Date()
       const tx = await program.methods
         .play()
         .accounts({
@@ -147,14 +147,17 @@ describe("slamjam-homerun-v1", () => {
         .signers([player1])
         .rpc()
 
-
       round = await program.account.round.fetch(roundPDA);
 
-      // Assert deadline is set and is gt current_timestamp.
-      const deadlineToDate = new Date(round.deadline.toNumber() * 1000)
+      // Assert deadline lower limit.
+      roundDeadlineBN = round.deadline
+      const deadlineToDate = new Date(roundDeadlineBN.toNumber() * 1000)
       expect(deadlineToDate).to.be.gte(currentTimestamp)
 
-      // TODO: Define some upper limit to check round time.
+      // Assert deadline upper limit.
+      currentTimestamp = new Date()
+      currentTimestamp = new Date(currentTimestamp.setSeconds(currentTimestamp.getSeconds() + ROUND_TIME_IN_SECONDS))
+      expect(deadlineToDate).to.be.lt(currentTimestamp)
 
       // Assert player balance gets subtracted.
       const player1BalanceAfter = await program.provider.connection.getBalance(player1.publicKey);
@@ -182,7 +185,7 @@ describe("slamjam-homerun-v1", () => {
       // Assert roundPDA has previous player fee as balance
       expect(roundBalanceBefore).to.be.equal(roundBalanceAfterFirstPlay)
       // Assert deadline is the one set in first call to play ()
-      expect(round.deadline.toNumber()).to.be.equal(roundDeadline)
+      expect(round.deadline.toString()).to.be.equal(roundDeadlineBN.toString())
 
       const tx = await program.methods
         .play()
@@ -211,9 +214,18 @@ describe("slamjam-homerun-v1", () => {
     })
 
     it("Shouldn't be able to play after deadline", async () => {
+      // waits deadline is reached.
+      await setTimeout(ROUND_TIME_IN_SECONDS * 1000 / 2)
 
+      try {
+        await program.methods
+          .play()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'PlayInClaimingPhase');
+      }
     })
-
   })
 })
 
