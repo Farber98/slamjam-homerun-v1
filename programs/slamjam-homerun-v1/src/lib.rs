@@ -4,7 +4,7 @@ use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 
 declare_id!("7rxVoKkHEj63EVcKi4gC3utmgs1D4chGP7HzQneMuyKV");
 const FEE: u64 = 1 * LAMPORTS_PER_SOL;
-const ROUND_TIME_IN_SECONDS: i64 = /* 3600 */ 3;
+const ROUND_TIME_IN_SECONDS: i64 = /* 3600 */ 4;
 
 #[program]
 pub mod slamjam_homerun_v1 {
@@ -84,13 +84,24 @@ pub mod slamjam_homerun_v1 {
 
         // Anyone can claim after grace period (timestamp > 2 * round.deadline)
 
+        // Prepare seeds to send for signing on behalf of PDA.
+        let bump = *ctx.bumps.get("round").unwrap();
+        let seeds = vec![bump];
+        let seeds = vec!["round".as_bytes(), seeds.as_slice()];
+        let seeds = vec![seeds.as_slice()];
+        let seeds = seeds.as_slice();
+
+            // TODO: WE DON'T OWN SYSTEM PROGRAM SO THIS WON'T WORK. NEED TO FIND A WORKAROUND.
         // Creates context for transfer CPI.
-        let cpi_context = CpiContext::new(
+        let cpi_context = CpiContext::new_with_signer(
             ctx.accounts.system_program.to_account_info(), 
+            // Transfer instruction.
             system_program::Transfer {
                 from: round.to_account_info(),
                 to: player,
-            });
+            },
+            seeds
+        );
 
         // Reentrancy is posible here? Idk but lets avoid risks :P
         let transfer_amount = round.pool;
@@ -200,7 +211,7 @@ pub struct Claim<'info> {
         bump,
     )]
     pub round: Account<'info, Round>,
-    #[account()]
+    #[account(mut)]
     pub player: Signer<'info>,
     pub system_program: Program<'info, System>,
 }

@@ -35,7 +35,7 @@ describe("slamjam-homerun-v1", () => {
 
   const FEE = 1 * web3.LAMPORTS_PER_SOL;
 
-  const ROUND_TIME_IN_SECONDS = /* 3600 */ 3;
+  const ROUND_TIME_IN_SECONDS = /* 3600 */ 4;
 
   describe("Before initialization", () => {
 
@@ -256,6 +256,22 @@ describe("slamjam-homerun-v1", () => {
       expect(round.score).to.be.equal(player2Score)
     })
 
+    it("Shouldn't be able to claim before deadline", async () => {
+      try {
+        await program.methods
+          .claim()
+          .accounts({
+            round: roundPDA,
+            player: player2.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId
+          })
+          .signers([player2])
+          .rpc()
+      } catch (error) {
+        console.log(error)
+      }
+    })
+
     it("Shouldn't be able to play after deadline", async () => {
       // waits deadline is reached.
       await setTimeout(ROUND_TIME_IN_SECONDS * 1000 / 2)
@@ -287,6 +303,19 @@ describe("slamjam-homerun-v1", () => {
         assert.strictEqual(error.error.errorCode.code, 'ScoreInClaimingPhase');
       }
     })
+
+    it("Shouldn't be able to claim if not winner inside grace period", async () => {
+
+    })
+
+    it("Should be able to claim if winner inside grace period", async () => {
+
+    })
+
+    it("Should be able to claim after grace period", async () => {
+
+    })
+
   })
 })
 
