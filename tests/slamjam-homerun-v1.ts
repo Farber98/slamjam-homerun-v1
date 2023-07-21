@@ -263,7 +263,6 @@ describe("slamjam-homerun-v1", () => {
           .accounts({
             round: roundPDA,
             player: player2.publicKey,
-            systemProgram: anchor.web3.SystemProgram.programId
           })
           .signers([player2])
           .rpc()

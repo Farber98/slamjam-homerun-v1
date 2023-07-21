@@ -84,32 +84,16 @@ pub mod slamjam_homerun_v1 {
 
         // Anyone can claim after grace period (timestamp > 2 * round.deadline)
 
-        // Prepare seeds to send for signing on behalf of PDA.
-        let bump = *ctx.bumps.get("round").unwrap();
-        let seeds = vec![bump];
-        let seeds = vec!["round".as_bytes(), seeds.as_slice()];
-        let seeds = vec![seeds.as_slice()];
-        let seeds = seeds.as_slice();
-
-            // TODO: WE DON'T OWN SYSTEM PROGRAM SO THIS WON'T WORK. NEED TO FIND A WORKAROUND.
-        // Creates context for transfer CPI.
-        let cpi_context = CpiContext::new_with_signer(
-            ctx.accounts.system_program.to_account_info(), 
-            // Transfer instruction.
-            system_program::Transfer {
-                from: round.to_account_info(),
-                to: player,
-            },
-            seeds
-        );
-
-        // Reentrancy is posible here? Idk but lets avoid risks :P
+        // Prepare amount to transfer from PDA's pool.
         let transfer_amount = round.pool;
         round.pool = 0;
-
-        // Transfers pool to player
-        system_program::transfer(cpi_context, transfer_amount)?;
-
+        
+        // Reduce PDA balance
+        **round.to_account_info().try_borrow_mut_lamports()? -= transfer_amount;
+        
+        // Add player balance
+        **ctx.accounts.player.to_account_info().try_borrow_mut_lamports()? += transfer_amount;
+        
         // Set deadline to zero so next play() caller sets new deadline.
         round.deadline = 0;
 
@@ -213,7 +197,6 @@ pub struct Claim<'info> {
     pub round: Account<'info, Round>,
     #[account(mut)]
     pub player: Signer<'info>,
-    pub system_program: Program<'info, System>,
 }
 
 
