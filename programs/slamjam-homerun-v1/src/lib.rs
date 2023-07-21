@@ -44,6 +44,7 @@ pub mod slamjam_homerun_v1 {
         // Transfers SOL from player to pool
         system_program::transfer(cpi_context, FEE)?;
         
+        // TODO: Add logic for only sending a portion to pool
         round.pool = round.pool.checked_add(FEE).unwrap();
 
         Ok(())
@@ -70,14 +71,17 @@ pub mod slamjam_homerun_v1 {
         let round = &mut ctx.accounts.round;
         let player = ctx.accounts.player.to_account_info();
 
-        let timestamp = Clock::get()?.unix_timestamp.checked_add(ROUND_TIME_IN_SECONDS).unwrap();
+        // If round.deadline is zero, you must play first to be able to claim.
+        require!(round.deadline > 0, Errors::ClaimInPlayingPhase);
+
+        let timestamp = Clock::get()?.unix_timestamp;
 
         // If timestamp > round.deadline, it's claiming phase.
         require!(round.deadline <= timestamp, Errors::ClaimInPlayingPhase);
         
         // Checking that only winner can claim inside grace period        
-        // If we are inside grace period
-        if timestamp <= round.deadline.checked_mul(2).unwrap() {
+        // If we are inside grace period ( timestamp <= 2 * round.deadline )
+        if timestamp <= round.deadline.checked_add(ROUND_TIME_IN_SECONDS).unwrap() {
             // Only the winner can claim
             require_keys_eq!(player.key(), round.winner, Errors::NotWinnerInGracePeriod);
         }
@@ -103,7 +107,7 @@ pub mod slamjam_homerun_v1 {
     pub fn kill(ctx: Context<Kill>) -> Result<()> {
         // Admins will be able to close PDA to recover rent and fees.
         // This will end v1 program.
-        require_eq!(ctx.accounts.round.winner, ctx.accounts.admin.key(), Errors::NotAdminKilling);
+        require_eq!(ctx.accounts.round.admin, ctx.accounts.admin.key(), Errors::NotAdminKilling);
         Ok(())
     }
 
@@ -209,7 +213,7 @@ pub struct Kill<'info> {
         close = admin,
     )]
     pub round: Account<'info, Round>,
-    #[account()]
+    #[account(mut)]
     pub admin: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
