@@ -3,7 +3,8 @@ use anchor_lang::system_program;
 use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 
 declare_id!("7rxVoKkHEj63EVcKi4gC3utmgs1D4chGP7HzQneMuyKV");
-const FEE: u64 = 1 * LAMPORTS_PER_SOL;
+const FEE: u64 = 1 * LAMPORTS_PER_SOL; // 1 SOL
+const COMMISION: u64 = FEE / 10; // 0.1 SOL
 const ROUND_TIME_IN_SECONDS: i64 = /* 3600 */ 4;
 
 #[program]
@@ -44,8 +45,12 @@ pub mod slamjam_homerun_v1 {
         // Transfers SOL from player to pool
         system_program::transfer(cpi_context, FEE)?;
         
-        // TODO: Add logic for only sending a portion to pool
-        round.pool = round.pool.checked_add(FEE).unwrap();
+        // Send 90% to pool.
+        let pool_amount = FEE - COMMISION;
+        round.pool = round.pool.checked_add(pool_amount).unwrap();
+
+        // Send 10% to commision.
+        round.commision = round.commision.checked_add(COMMISION).unwrap();
 
         Ok(())
     }
@@ -105,7 +110,7 @@ pub mod slamjam_homerun_v1 {
     }
 
     pub fn kill(ctx: Context<Kill>) -> Result<()> {
-        // Admins will be able to close PDA to recover rent and fees.
+        // Admins will be able to close PDA to recover rent and commision.
         // This will end v1 program.
         require_eq!(ctx.accounts.round.admin, ctx.accounts.admin.key(), Errors::NotAdminKilling);
         Ok(())
@@ -132,7 +137,10 @@ pub struct Round {
     deadline: i64, // 8
     
     // Pool amount
-    pool: u64
+    pool: u64,
+
+    // Commision amount
+    commision: u64
 }
 
 // An enum for custom error codes
@@ -157,7 +165,7 @@ pub struct Initialize<'info> {
         seeds = [b"round"],
         bump,
         payer = initializer, 
-        space = 8 + 1 + 32 + 32 + 2 + 8 + 8,
+        space = 8 + 1 + 32 + 32 + 2 + 8 + 8 + 8,
         constraint = !round.initialized @ Errors::RoundAlreadyInitialized
     )]
     pub round: Account<'info, Round>,

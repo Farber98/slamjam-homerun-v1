@@ -34,7 +34,7 @@ describe("slamjam-homerun-v1", () => {
   )
 
   const FEE = 1 * web3.LAMPORTS_PER_SOL;
-
+  const COMMISION = FEE / 10; // 0.1 SOL
   const ROUND_TIME_IN_SECONDS = /* 3600 */ 4;
 
   describe("Before initialization", () => {
@@ -128,6 +128,9 @@ describe("slamjam-homerun-v1", () => {
     let roundBalanceAfterFirstPlay: number;
     const player1Score = 5
     const player2Score = player1Score + 10
+    const FeeToBN = new BN(FEE)
+    const CommisionToBN = new BN(COMMISION)
+    const FeeMinusCommisionToBN = FeeToBN.sub(CommisionToBN)
 
     it("Should play (first) gracefully setting deadline", async () => {
       let round = await program.account.round.fetch(roundPDA);
@@ -170,9 +173,8 @@ describe("slamjam-homerun-v1", () => {
       expect(roundBalanceAfterFirstPlay).to.be.equal(roundBalanceBefore + FEE)
 
       // Assert pool is added
-      const FeeToBN = new BN(FEE)
       const roundPoolAfter = round.pool
-      expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeToBN).toString())
+      expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeMinusCommisionToBN).toString())
     })
 
     it("Should play (second) gracefully", async () => {
@@ -180,10 +182,9 @@ describe("slamjam-homerun-v1", () => {
       const player2BalanceBefore = await program.provider.connection.getBalance(player2.publicKey);
       const roundPoolBefore = round.pool
       const roundBalanceBefore = await program.provider.connection.getBalance(roundPDA);
-      const FeeToBN = new BN(FEE)
 
       // Assert pool has previous player fee
-      expect(roundPoolBefore.toString()).to.be.equal(FeeToBN.toString())
+      expect(roundPoolBefore.toString()).to.be.equal(FeeMinusCommisionToBN.toString())
       // Assert roundPDA has previous player fee as balance
       expect(roundBalanceBefore).to.be.equal(roundBalanceAfterFirstPlay)
       // Assert deadline is the one set in first call to play ()
@@ -211,7 +212,7 @@ describe("slamjam-homerun-v1", () => {
 
       // Assert pool is added
       const roundPoolAfter = round.pool
-      expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeToBN).toString())
+      expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeMinusCommisionToBN).toString())
     })
 
     it("Should set player 1 as winner", async () => {
@@ -343,7 +344,6 @@ describe("slamjam-homerun-v1", () => {
       const player2BalanceBefore = new BN(await program.provider.connection.getBalance(player2.publicKey));
       const roundPoolBefore = round.pool
       const roundBalanceBefore = new BN(await program.provider.connection.getBalance(roundPDA));
-      const FeeToBN = new BN(FEE)
 
       // Assert pool has previous player fee
       expect(round.deadline.toNumber()).not.to.be.equal(0);
@@ -374,7 +374,9 @@ describe("slamjam-homerun-v1", () => {
 
   describe("Live: Second Round", () => {
     let roundDeadlineBN: anchor.BN;
-    const player2Score = 5
+    const FeeToBN = new BN(FEE)
+    const CommisionToBN = new BN(COMMISION)
+    const FeeMinusCommisionToBN = FeeToBN.sub(CommisionToBN)
 
     it("Should play (first) gracefully setting deadline", async () => {
       let round = await program.account.round.fetch(roundPDA);
@@ -417,9 +419,8 @@ describe("slamjam-homerun-v1", () => {
       expect(roundBalanceAfterFirstPlay).to.be.equal(roundBalanceBefore + FEE)
 
       // Assert pool is added
-      const FeeToBN = new BN(FEE)
       const roundPoolAfter = round.pool
-      expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeToBN).toString())
+      expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeMinusCommisionToBN).toString())
     })
 
     it("Should be able to claim if not winner (player 1) after grace period", async () => {
@@ -459,13 +460,19 @@ describe("slamjam-homerun-v1", () => {
     })
 
     it("Should be able (admin) to kill v1", async () => {
-      // TODO: Check balance gets added for killer.
+      const balanceBefore = await program.provider.connection.getBalance(provider.wallet.publicKey);
+      let round = await program.account.round.fetch(roundPDA);
+      let commision = round.commision
+
       await program.methods
         .kill()
         .accounts({
           round: roundPDA
         })
         .rpc()
+
+      const balanceAfter = await program.provider.connection.getBalance(provider.wallet.publicKey);;
+      expect(balanceAfter).to.be.gte(balanceBefore + commision.toNumber())
     })
 
     it("Shouldn't exist a Round after calling kill", async () => {
