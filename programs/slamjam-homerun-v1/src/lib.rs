@@ -23,6 +23,9 @@ pub mod slamjam_homerun_v1 {
     pub fn play(ctx: Context<Play>) -> Result<()> {
         let round = &mut ctx.accounts.round;
         
+        // Game must be running.
+        require!(!round.ended, Errors::GameEnded);
+
         let timestamp = Clock::get()?.unix_timestamp.checked_add(ROUND_TIME_IN_SECONDS).unwrap();
 
         // If round has no deadline, deadline must be set.
@@ -58,6 +61,12 @@ pub mod slamjam_homerun_v1 {
     pub fn score(ctx: Context<Score>, score: u16) -> Result<()> {
         let round = &mut ctx.accounts.round;
         
+        // If game already ended
+        require!(!round.ended, Errors::GameEnded);
+        
+        // If there's no round
+        require!(round.deadline != 0, Errors::ScoreWithoutRound);
+
         let timestamp = Clock::get()?.unix_timestamp;
 
         // If timestamp > round.deadline, it's claiming phase.
@@ -76,12 +85,12 @@ pub mod slamjam_homerun_v1 {
         let round = &mut ctx.accounts.round;
         let player = ctx.accounts.player.to_account_info();
 
-        // If round.deadline is zero, you must play first to be able to claim.
-        require!(round.deadline > 0, Errors::ClaimInPlayingPhase);
+        // A round must be running to be able to claim.
+        require!(round.deadline > 0, Errors::ClaimWithoutRound); // TODO:Not being checked
 
         let timestamp = Clock::get()?.unix_timestamp;
 
-        // If timestamp > round.deadline, it's claiming phase.
+        // If timestamp > round.deadline, it's playing phase.
         require!(round.deadline <= timestamp, Errors::ClaimInPlayingPhase);
         
         // Checking that only winner can claim inside grace period        
@@ -109,10 +118,36 @@ pub mod slamjam_homerun_v1 {
         Ok(())
     }
 
+    pub fn end(ctx: Context<End>) -> Result<()> {
+        // Admins will be able to end game to prevent a new round from starting.
+        // This will end v1 program.
+        let round = &mut ctx.accounts.round;
+
+        // Check caller is admin.
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminEnding);
+
+        // Game must be running
+        require!(!round.ended, Errors::GameEnded);
+
+        round.ended = true;
+
+        Ok(())
+    }
+
     pub fn kill(ctx: Context<Kill>) -> Result<()> {
         // Admins will be able to close PDA to recover rent and commision.
-        // This will end v1 program.
-        require_eq!(ctx.accounts.round.admin, ctx.accounts.admin.key(), Errors::NotAdminKilling);
+        // This will kill v1 program.
+        let round = &ctx.accounts.round;
+
+        // Check caller is admin.
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminKilling);
+
+        // Game must be ended
+        require!(round.ended, Errors::KillBeforeEnding);
+
+        // Pool must be empty
+        require!(round.pool == 0, Errors::KillWithPool);
+        
         Ok(())
     }
 
@@ -122,6 +157,9 @@ pub mod slamjam_homerun_v1 {
 pub struct Round {
     // Winner of the round
     initialized: bool, // 1
+
+    // Ends v1
+    ended: bool, // 1
 
     // Admin of the round
     admin: Pubkey, // 32
@@ -148,14 +186,25 @@ pub struct Round {
 pub enum Errors {
     #[msg("Round already initialized")]
     RoundAlreadyInitialized,
+    #[msg("Game ended")]
+    GameEnded,
     #[msg("Not in playing phase")]
     PlayInClaimingPhase,
     #[msg("Not in scoring phase")]
+    ScoreWithoutRound,
+    #[msg("Not in scoring phase")]
     ScoreInClaimingPhase,
     #[msg("Not in claiming phase")]
+    ClaimWithoutRound,
+    #[msg("Not in claiming phase")]
     ClaimInPlayingPhase,
+    #[msg("Game still running")]
+    KillBeforeEnding,
+    #[msg("Pool is not empty")]
+    KillWithPool,
     NotWinnerInGracePeriod,
     NotAdminKilling,
+    NotAdminEnding,
 }
 
 #[derive(Accounts)]
@@ -165,7 +214,7 @@ pub struct Initialize<'info> {
         seeds = [b"round"],
         bump,
         payer = initializer, 
-        space = 8 + 1 + 32 + 32 + 2 + 8 + 8 + 8,
+        space = 8 + 1 + 1 + 32 + 32 + 2 + 8 + 8 + 8,
         constraint = !round.initialized @ Errors::RoundAlreadyInitialized
     )]
     pub round: Account<'info, Round>,
@@ -209,6 +258,17 @@ pub struct Claim<'info> {
     pub round: Account<'info, Round>,
     #[account(mut)]
     pub player: Signer<'info>,
+}
+#[derive(Accounts)]
+pub struct End<'info> {
+    #[account(
+        mut, 
+        seeds = [b"round"],
+        bump,
+    )]
+    pub round: Account<'info, Round>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
 }
 
 

@@ -80,6 +80,17 @@ describe("slamjam-homerun-v1", () => {
       }
     })
 
+    it("Shouldn't be able to end before calling Initialize", async () => {
+      try {
+        await program.methods
+          .end()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'AccountNotInitialized');
+      }
+    })
+
     it("Shouldn't be able to kill before calling Initialize", async () => {
       try {
         await program.methods
@@ -131,6 +142,21 @@ describe("slamjam-homerun-v1", () => {
     const FeeToBN = new BN(FEE)
     const CommisionToBN = new BN(COMMISION)
     const FeeMinusCommisionToBN = FeeToBN.sub(CommisionToBN)
+
+    it("Shouldn't be able to score before starting round", async () => {
+      try {
+        await program.methods
+          .score(player2Score + 10)
+          .accounts({
+            round: roundPDA,
+            player: player1.publicKey
+          })
+          .signers([player1])
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'ScoreWithoutRound');
+      }
+    })
 
     it("Should play (first) gracefully setting deadline", async () => {
       let round = await program.account.round.fetch(roundPDA);
@@ -255,21 +281,6 @@ describe("slamjam-homerun-v1", () => {
 
       expect(round.winner.toBase58().toString()).to.be.equal(player2.publicKey.toString())
       expect(round.score).to.be.equal(player2Score)
-    })
-
-    it("Shouldn't be able (anyone) to kill v1", async () => {
-      try {
-        await program.methods
-          .kill()
-          .accounts({
-            round: roundPDA,
-            admin: player2.publicKey
-          })
-          .signers([player2])
-          .rpc()
-      } catch (error) {
-        assert.strictEqual(error.error.errorCode.code, 'NotAdminKilling');
-      }
     })
 
     it("Shouldn't be able to claim before deadline", async () => {
@@ -423,6 +434,77 @@ describe("slamjam-homerun-v1", () => {
       expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeMinusCommisionToBN).toString())
     })
 
+    it("Shouldn't be able (anyone) to end game", async () => {
+      try {
+        await program.methods
+          .end()
+          .accounts({
+            round: roundPDA,
+            admin: player2.publicKey
+          })
+          .signers([player2])
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'NotAdminEnding');
+      }
+    })
+
+    it("Shouldn't be able (anyone) to kill v1", async () => {
+      try {
+        await program.methods
+          .kill()
+          .accounts({
+            round: roundPDA,
+            admin: player2.publicKey
+          })
+          .signers([player2])
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'NotAdminKilling');
+      }
+    })
+
+    it("Shouldn't be able (admin) to kill v1 when game not ended", async () => {
+      try {
+        await program.methods
+          .kill()
+          .accounts({
+            round: roundPDA,
+          })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'KillBeforeEnding');
+      }
+    })
+
+    it("Should be able (admin) to end game", async () => {
+      let round = await program.account.round.fetch(roundPDA);
+      expect(round.ended).to.be.false
+
+      await program.methods
+        .end()
+        .accounts({
+          round: roundPDA,
+        })
+        .rpc()
+
+      round = await program.account.round.fetch(roundPDA);
+      expect(round.ended).to.be.true
+    })
+
+    it("Shouldn't be able (admin) to kill v1 when pool not empty", async () => {
+      try {
+        await program.methods
+          .kill()
+          .accounts({
+            round: roundPDA,
+          })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'KillWithPool');
+      }
+    })
+
     it("Should be able to claim if not winner (player 1) after grace period", async () => {
       // waits deadline is reached.
       await setTimeout(2 * (ROUND_TIME_IN_SECONDS + 1) * 1000)
@@ -459,7 +541,18 @@ describe("slamjam-homerun-v1", () => {
       expect(player1BalanceAfter.toString()).to.be.equal(player1BalanceBefore.add(roundPoolBefore).toString())
     })
 
-    it("Should be able (admin) to kill v1", async () => {
+    it("Shouldn't be able to start another round after game ended", async () => {
+      try {
+        await program.methods
+          .play()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'GameEnded');
+      }
+    })
+
+    it("Should be able (admin) to kill v1 when ended and pool empty", async () => {
       const balanceBefore = await program.provider.connection.getBalance(provider.wallet.publicKey);
       let round = await program.account.round.fetch(roundPDA);
       let commision = round.commision
@@ -482,5 +575,8 @@ describe("slamjam-homerun-v1", () => {
         assert.strictEqual(error.message, 'Account does not exist or has no data H6kqNVWXv1pTxSTn3dEtZ52nZpAHTAi95hS84owEeaaZ');
       }
     })
+
+
+
   })
 })
