@@ -24,7 +24,7 @@ pub mod slamjam_homerun_v1 {
         let round = &mut ctx.accounts.round;
         
         // Game must be running.
-        require!(!round.ended, Errors::GameEnded);
+        require!(!round.paused, Errors::GamePaused);
 
         let timestamp = Clock::get()?.unix_timestamp.checked_add(ROUND_TIME_IN_SECONDS).unwrap();
 
@@ -61,8 +61,8 @@ pub mod slamjam_homerun_v1 {
     pub fn score(ctx: Context<Score>, score: u16) -> Result<()> {
         let round = &mut ctx.accounts.round;
         
-        // If game already ended
-        require!(!round.ended, Errors::GameEnded);
+        // If game paused
+        require!(!round.paused, Errors::GamePaused);
         
         // If there's no round
         require!(round.deadline != 0, Errors::ScoreWithoutRound);
@@ -118,18 +118,34 @@ pub mod slamjam_homerun_v1 {
         Ok(())
     }
 
-    pub fn end(ctx: Context<End>) -> Result<()> {
-        // Admins will be able to end game to prevent a new round from starting.
-        // This will end v1 program.
+    pub fn pause(ctx: Context<Pause>) -> Result<()> {
+        // Admins will be able to pause game to prevent a new round from starting.
         let round = &mut ctx.accounts.round;
 
         // Check caller is admin.
-        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminEnding);
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminPausing);
 
-        // Game must be running
-        require!(!round.ended, Errors::GameEnded);
+         // Game must be running
+         require!(!round.paused, Errors::GamePaused);
 
-        round.ended = true;
+        round.paused = true;
+
+
+        Ok(())
+    }
+
+    pub fn resume(ctx: Context<Resume>) -> Result<()> {
+        // Admins will be able to resume game to make a new round start again when calling play.
+        
+        let round = &mut ctx.accounts.round;
+
+        // Check caller is admin.
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminResuming);
+
+        // Game must be paused
+        require!(round.paused, Errors::GameNotPaused);
+
+        round.paused = false;
 
         Ok(())
     }
@@ -143,10 +159,34 @@ pub mod slamjam_homerun_v1 {
         require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminKilling);
 
         // Game must be ended
-        require!(round.ended, Errors::KillBeforeEnding);
+        require!(round.paused, Errors::KillBeforePausing);
 
         // Pool must be empty
         require!(round.pool == 0, Errors::KillWithPool);
+        
+        Ok(())
+    }
+
+    pub fn profit(ctx: Context<Kill>) -> Result<()> {
+        // Admins will be able to take profit from PDA.
+        
+        let round = &mut ctx.accounts.round;
+
+        // Check caller is admin.
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminKilling);
+
+        // Check there is something to take profit
+        require!(round.commision != 0, Errors::ProfitEmpty);
+        
+        // Prepare amount to transfer from PDA's commision.
+        let transfer_amount = round.commision;
+        round.commision = 0;
+        
+        // Reduce PDA balance
+        **round.to_account_info().try_borrow_mut_lamports()? -= transfer_amount;
+        
+        // Add admin balance
+        **ctx.accounts.admin.to_account_info().try_borrow_mut_lamports()? += transfer_amount;
         
         Ok(())
     }
@@ -158,8 +198,8 @@ pub struct Round {
     // Winner of the round
     initialized: bool, // 1
 
-    // Ends v1
-    ended: bool, // 1
+    // Pauses round
+    paused: bool, // 1
 
     // Admin of the round
     admin: Pubkey, // 32
@@ -186,8 +226,10 @@ pub struct Round {
 pub enum Errors {
     #[msg("Round already initialized")]
     RoundAlreadyInitialized,
-    #[msg("Game ended")]
-    GameEnded,
+    #[msg("Game paused")]
+    GamePaused,
+    #[msg("Game not paused")]
+    GameNotPaused,
     #[msg("Not in playing phase")]
     PlayInClaimingPhase,
     #[msg("Not in scoring phase")]
@@ -199,12 +241,15 @@ pub enum Errors {
     #[msg("Not in claiming phase")]
     ClaimInPlayingPhase,
     #[msg("Game still running")]
-    KillBeforeEnding,
+    KillBeforePausing,
     #[msg("Pool is not empty")]
     KillWithPool,
+    #[msg("Commision is empty")]
+    ProfitEmpty,
     NotWinnerInGracePeriod,
     NotAdminKilling,
-    NotAdminEnding,
+    NotAdminPausing,
+    NotAdminResuming,
 }
 
 #[derive(Accounts)]
@@ -260,7 +305,18 @@ pub struct Claim<'info> {
     pub player: Signer<'info>,
 }
 #[derive(Accounts)]
-pub struct End<'info> {
+pub struct Pause<'info> {
+    #[account(
+        mut, 
+        seeds = [b"round"],
+        bump,
+    )]
+    pub round: Account<'info, Round>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+}
+#[derive(Accounts)]
+pub struct Resume<'info> {
     #[account(
         mut, 
         seeds = [b"round"],
@@ -284,4 +340,16 @@ pub struct Kill<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Profit<'info> {
+    #[account(
+        mut, 
+        seeds = [b"round"],
+        bump,
+    )]
+    pub round: Account<'info, Round>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
 }

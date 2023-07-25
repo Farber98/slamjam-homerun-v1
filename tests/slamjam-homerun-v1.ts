@@ -80,10 +80,32 @@ describe("slamjam-homerun-v1", () => {
       }
     })
 
-    it("Shouldn't be able to end before calling Initialize", async () => {
+    it("Shouldn't be able to pause before calling Initialize", async () => {
       try {
         await program.methods
-          .end()
+          .pause()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'AccountNotInitialized');
+      }
+    })
+
+    it("Shouldn't be able to resume before calling Initialize", async () => {
+      try {
+        await program.methods
+          .resume()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'AccountNotInitialized');
+      }
+    })
+
+    it("Shouldn't be able to profit before calling Initialize", async () => {
+      try {
+        await program.methods
+          .profit()
           .accounts({ round: roundPDA })
           .rpc()
       } catch (error) {
@@ -434,10 +456,10 @@ describe("slamjam-homerun-v1", () => {
       expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeMinusCommisionToBN).toString())
     })
 
-    it("Shouldn't be able (anyone) to end game", async () => {
+    it("Shouldn't be able (anyone) to pause game", async () => {
       try {
         await program.methods
-          .end()
+          .pause()
           .accounts({
             round: roundPDA,
             admin: player2.publicKey
@@ -445,7 +467,7 @@ describe("slamjam-homerun-v1", () => {
           .signers([player2])
           .rpc()
       } catch (error) {
-        assert.strictEqual(error.error.errorCode.code, 'NotAdminEnding');
+        assert.strictEqual(error.error.errorCode.code, 'NotAdminPausing');
       }
     })
 
@@ -464,7 +486,7 @@ describe("slamjam-homerun-v1", () => {
       }
     })
 
-    it("Shouldn't be able (admin) to kill v1 when game not ended", async () => {
+    it("Shouldn't be able (admin) to kill v1 when game not paused", async () => {
       try {
         await program.methods
           .kill()
@@ -473,23 +495,23 @@ describe("slamjam-homerun-v1", () => {
           })
           .rpc()
       } catch (error) {
-        assert.strictEqual(error.error.errorCode.code, 'KillBeforeEnding');
+        assert.strictEqual(error.error.errorCode.code, 'KillBeforePausing');
       }
     })
 
-    it("Should be able (admin) to end game", async () => {
+    it("Should be able (admin) to pause game", async () => {
       let round = await program.account.round.fetch(roundPDA);
-      expect(round.ended).to.be.false
+      expect(round.paused).to.be.false
 
       await program.methods
-        .end()
+        .pause()
         .accounts({
           round: roundPDA,
         })
         .rpc()
 
       round = await program.account.round.fetch(roundPDA);
-      expect(round.ended).to.be.true
+      expect(round.paused).to.be.true
     })
 
     it("Shouldn't be able (admin) to kill v1 when pool not empty", async () => {
@@ -541,18 +563,18 @@ describe("slamjam-homerun-v1", () => {
       expect(player1BalanceAfter.toString()).to.be.equal(player1BalanceBefore.add(roundPoolBefore).toString())
     })
 
-    it("Shouldn't be able to start another round after game ended", async () => {
+    it("Shouldn't be able to start another round after game paused", async () => {
       try {
         await program.methods
           .play()
           .accounts({ round: roundPDA })
           .rpc()
       } catch (error) {
-        assert.strictEqual(error.error.errorCode.code, 'GameEnded');
+        assert.strictEqual(error.error.errorCode.code, 'GamePaused');
       }
     })
 
-    it("Should be able (admin) to kill v1 when ended and pool empty", async () => {
+    it("Should be able (admin) to kill v1 when paused and pool empty", async () => {
       const balanceBefore = await program.provider.connection.getBalance(provider.wallet.publicKey);
       let round = await program.account.round.fetch(roundPDA);
       let commision = round.commision
