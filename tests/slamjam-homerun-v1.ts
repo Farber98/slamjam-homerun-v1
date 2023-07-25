@@ -39,7 +39,7 @@ describe("slamjam-homerun-v1", () => {
 
   describe("Before initialization", () => {
 
-    it("Shouldn't exist a Round before calling Initialize", async () => {
+    it("Shouldn't exist a round before calling Initialize", async () => {
       try {
         await program.account.round.fetch(roundPDA);
       } catch (error) {
@@ -127,7 +127,7 @@ describe("slamjam-homerun-v1", () => {
 
   describe("Initialization", () => {
 
-    it("Should create Round when calling Initialize", async () => {
+    it("Should create round when calling Initialize", async () => {
       await program.methods
         .initialize()
         .accounts({ round: roundPDA })
@@ -177,6 +177,60 @@ describe("slamjam-homerun-v1", () => {
           .rpc()
       } catch (error) {
         assert.strictEqual(error.error.errorCode.code, 'ScoreWithoutRound');
+      }
+    })
+
+    it("Shouldn't be able (anyone) to profit", async () => {
+      try {
+        await program.methods
+          .profit()
+          .accounts({
+            round: roundPDA,
+            admin: player1.publicKey
+          })
+          .signers([player1])
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'NotAdmin');
+      }
+    })
+
+    it("Shouldn't be able (admin) to profit if there's no commision", async () => {
+      try {
+        await program.methods
+          .profit()
+          .accounts({
+            round: roundPDA,
+          })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'ProfitEmpty');
+      }
+    })
+
+    it("Shouldn't be able to claim before starting round", async () => {
+      try {
+        await program.methods
+          .claim()
+          .accounts({
+            round: roundPDA,
+          })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'ClaimWithoutRound');
+      }
+    })
+
+    it("Shouldn't be able to resume resumed game", async () => {
+      try {
+        await program.methods
+          .resume()
+          .accounts({
+            round: roundPDA,
+          })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'GameNotPaused');
       }
     })
 
@@ -403,6 +457,62 @@ describe("slamjam-homerun-v1", () => {
       const player2BalanceAfter = new BN(await program.provider.connection.getBalance(player2.publicKey));
       expect(player2BalanceAfter.toString()).to.be.equal(player2BalanceBefore.add(roundPoolBefore).toString())
     })
+
+    it("Should be able (admin) to pause game", async () => {
+      let round = await program.account.round.fetch(roundPDA);
+      expect(round.paused).to.be.false
+
+      await program.methods
+        .pause()
+        .accounts({
+          round: roundPDA,
+        })
+        .rpc()
+
+      round = await program.account.round.fetch(roundPDA);
+      expect(round.paused).to.be.true
+    })
+
+    it("Shouldn't be able to start another round after game paused", async () => {
+      try {
+        await program.methods
+          .play()
+          .accounts({ round: roundPDA })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'GamePaused');
+      }
+    })
+
+    it("Shouldn't be able (anyone) to resume game", async () => {
+      try {
+        await program.methods
+          .resume()
+          .accounts({
+            round: roundPDA,
+            admin: player2.publicKey
+          })
+          .signers([player2])
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'NotAdmin');
+      }
+    })
+
+    it("Should be able (admin) to resume game", async () => {
+      let round = await program.account.round.fetch(roundPDA);
+      expect(round.paused).to.be.true
+
+      await program.methods
+        .resume()
+        .accounts({
+          round: roundPDA,
+        })
+        .rpc()
+
+      round = await program.account.round.fetch(roundPDA);
+      expect(round.paused).to.be.false
+    })
   })
 
   describe("Live: Second Round", () => {
@@ -411,7 +521,7 @@ describe("slamjam-homerun-v1", () => {
     const CommisionToBN = new BN(COMMISION)
     const FeeMinusCommisionToBN = FeeToBN.sub(CommisionToBN)
 
-    it("Should play (first) gracefully setting deadline", async () => {
+    it("Should play (first) gracefully setting deadline after game resumed", async () => {
       let round = await program.account.round.fetch(roundPDA);
       const player2BalanceBefore = await program.provider.connection.getBalance(player2.publicKey);
       const roundPoolBefore = round.pool
@@ -467,7 +577,7 @@ describe("slamjam-homerun-v1", () => {
           .signers([player2])
           .rpc()
       } catch (error) {
-        assert.strictEqual(error.error.errorCode.code, 'NotAdminPausing');
+        assert.strictEqual(error.error.errorCode.code, 'NotAdmin');
       }
     })
 
@@ -482,7 +592,7 @@ describe("slamjam-homerun-v1", () => {
           .signers([player2])
           .rpc()
       } catch (error) {
-        assert.strictEqual(error.error.errorCode.code, 'NotAdminKilling');
+        assert.strictEqual(error.error.errorCode.code, 'NotAdmin');
       }
     })
 
@@ -512,6 +622,19 @@ describe("slamjam-homerun-v1", () => {
 
       round = await program.account.round.fetch(roundPDA);
       expect(round.paused).to.be.true
+    })
+
+    it("Shouldn't be able to pause paused game", async () => {
+      try {
+        await program.methods
+          .pause()
+          .accounts({
+            round: roundPDA,
+          })
+          .rpc()
+      } catch (error) {
+        assert.strictEqual(error.error.errorCode.code, 'GamePaused');
+      }
     })
 
     it("Shouldn't be able (admin) to kill v1 when pool not empty", async () => {
@@ -597,8 +720,6 @@ describe("slamjam-homerun-v1", () => {
         assert.strictEqual(error.message, 'Account does not exist or has no data H6kqNVWXv1pTxSTn3dEtZ52nZpAHTAi95hS84owEeaaZ');
       }
     })
-
-
 
   })
 })

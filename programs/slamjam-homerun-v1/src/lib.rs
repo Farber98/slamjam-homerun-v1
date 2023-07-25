@@ -86,7 +86,10 @@ pub mod slamjam_homerun_v1 {
         let player = ctx.accounts.player.to_account_info();
 
         // A round must be running to be able to claim.
-        require!(round.deadline > 0, Errors::ClaimWithoutRound); // TODO:Not being checked
+        require!(round.deadline > 0, Errors::ClaimWithoutRound); 
+        
+        // Pool must have something to be able to claim.
+        require!(round.pool != 0, Errors::PoolEmpty); // TODO: check when can happen
 
         let timestamp = Clock::get()?.unix_timestamp;
 
@@ -123,7 +126,7 @@ pub mod slamjam_homerun_v1 {
         let round = &mut ctx.accounts.round;
 
         // Check caller is admin.
-        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminPausing);
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdmin);
 
          // Game must be running
          require!(!round.paused, Errors::GamePaused);
@@ -140,7 +143,7 @@ pub mod slamjam_homerun_v1 {
         let round = &mut ctx.accounts.round;
 
         // Check caller is admin.
-        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminResuming);
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdmin);
 
         // Game must be paused
         require!(round.paused, Errors::GameNotPaused);
@@ -150,30 +153,13 @@ pub mod slamjam_homerun_v1 {
         Ok(())
     }
 
-    pub fn kill(ctx: Context<Kill>) -> Result<()> {
-        // Admins will be able to close PDA to recover rent and commision.
-        // This will kill v1 program.
-        let round = &ctx.accounts.round;
-
-        // Check caller is admin.
-        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminKilling);
-
-        // Game must be ended
-        require!(round.paused, Errors::KillBeforePausing);
-
-        // Pool must be empty
-        require!(round.pool == 0, Errors::KillWithPool);
-        
-        Ok(())
-    }
-
     pub fn profit(ctx: Context<Kill>) -> Result<()> {
         // Admins will be able to take profit from PDA.
         
         let round = &mut ctx.accounts.round;
 
         // Check caller is admin.
-        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdminKilling);
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdmin);
 
         // Check there is something to take profit
         require!(round.commision != 0, Errors::ProfitEmpty);
@@ -190,6 +176,25 @@ pub mod slamjam_homerun_v1 {
         
         Ok(())
     }
+
+    pub fn kill(ctx: Context<Kill>) -> Result<()> {
+        // Admins will be able to close PDA to recover rent and commision.
+        // This will kill v1 program.
+        let round = &ctx.accounts.round;
+
+        // Check caller is admin.
+        require_eq!(round.admin, ctx.accounts.admin.key(), Errors::NotAdmin);
+
+        // Game must be ended
+        require!(round.paused, Errors::KillBeforePausing);
+
+        // Pool must be empty
+        require!(round.pool == 0, Errors::KillWithPool);
+        
+        Ok(())
+    }
+
+    
 
 }
 
@@ -246,10 +251,11 @@ pub enum Errors {
     KillWithPool,
     #[msg("Commision is empty")]
     ProfitEmpty,
+    #[msg("Pool is empty")]
+    PoolEmpty,
     NotWinnerInGracePeriod,
-    NotAdminKilling,
-    NotAdminPausing,
-    NotAdminResuming,
+    #[msg("Only admin")]
+    NotAdmin,
 }
 
 #[derive(Accounts)]
@@ -327,6 +333,17 @@ pub struct Resume<'info> {
     pub admin: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct Profit<'info> {
+    #[account(
+        mut, 
+        seeds = [b"round"],
+        bump,
+    )]
+    pub round: Account<'info, Round>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+}
 
 #[derive(Accounts)]
 pub struct Kill<'info> {
@@ -342,14 +359,3 @@ pub struct Kill<'info> {
     pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-pub struct Profit<'info> {
-    #[account(
-        mut, 
-        seeds = [b"round"],
-        bump,
-    )]
-    pub round: Account<'info, Round>,
-    #[account(mut)]
-    pub admin: Signer<'info>,
-}
