@@ -2,17 +2,26 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 
+
 declare_id!("7rxVoKkHEj63EVcKi4gC3utmgs1D4chGP7HzQneMuyKV");
-const FEE: u64 = 1 * LAMPORTS_PER_SOL; // 1 SOL
-const COMMISION: u64 = FEE / 10; // 0.1 SOL
-const ROUND_TIME_IN_SECONDS: i64 = /* 3600 */ 4;
+
+pub const FEE: u64 = 1 * LAMPORTS_PER_SOL; // 1 SOL
+pub const COMMISION: u64 = FEE / 10; // 0.1 SOL
+
+#[cfg(feature = "testing")]
+#[constant]
+pub const ROUND_TIME_IN_SECONDS: i64 = 4;
+
+#[cfg(feature = "production")]
+#[constant]
+pub const ROUND_TIME_IN_SECONDS: i64 = 3600;
 
 // TODO: Feature flags for tests and maybe for adm wall.
 #[program]
 pub mod slamjam_homerun_v1 {
 
     use super::*;
-    
+
     // TODO: make this only admin
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         // Initialize round and sets admin
