@@ -13,6 +13,7 @@ pub mod slamjam_homerun_v1 {
 
     use super::*;
     
+    // TODO: make this only admin
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         // Initialize round and sets admin
         let round = &mut ctx.accounts.round;

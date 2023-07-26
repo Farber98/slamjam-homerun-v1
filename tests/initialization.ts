@@ -6,7 +6,8 @@ import { SlamjamHomerunV1 } from "../target/types/slamjam_homerun_v1";
 export function Initialization(program: anchor.Program<SlamjamHomerunV1>, roundPDA: anchor.web3.PublicKey, provider: anchor.AnchorProvider) {
     describe("Initialization", () => {
 
-        it("Should create round when calling Initialize", async () => {
+        // TODO: make this only admin
+        it("should create round when calling initialize", async () => {
             await program.methods
                 .initialize()
                 .accounts({ round: roundPDA })
@@ -22,7 +23,7 @@ export function Initialization(program: anchor.Program<SlamjamHomerunV1>, roundP
             expect(round.pool.toNumber()).to.be.equal(0)
         })
 
-        it("Shouldn't be able to call Initialize twice", async () => {
+        it("anyone shouldn't be able to call initialize again", async () => {
             try {
                 await program.methods
                     .initialize()
