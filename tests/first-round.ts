@@ -21,7 +21,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
         const CommisionToBN = new BN(COMMISION)
         const FeeMinusCommisionToBN = FeeToBN.sub(CommisionToBN)
 
-        it("Shouldn't be able to score before starting round", async () => {
+        it("anyone shouldn't be able to score before starting round", async () => {
             try {
                 await program.methods
                     .score(player2Score + 10)
@@ -36,7 +36,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Shouldn't be able (anyone) to profit", async () => {
+        it("anyone shouldn't be able to profit", async () => {
             try {
                 await program.methods
                     .profit()
@@ -51,7 +51,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Shouldn't be able (admin) to profit if there's no commision", async () => {
+        it("admin shouldn't be able to profit if there's no commision", async () => {
             try {
                 await program.methods
                     .profit()
@@ -64,7 +64,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Shouldn't be able to claim before starting round", async () => {
+        it("anyone shouldn't be able to claim before starting round", async () => {
             try {
                 await program.methods
                     .claim()
@@ -77,7 +77,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Shouldn't be able to resume resumed game", async () => {
+        it("anyone shouldn't be able to resume resumed game", async () => {
             try {
                 await program.methods
                     .resume()
@@ -90,7 +90,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Should play (first) gracefully setting deadline", async () => {
+        it("player 1 should be able to play first setting deadline", async () => {
             let round = await program.account.round.fetch(roundPDA);
             const player1BalanceBefore = await program.provider.connection.getBalance(player1.publicKey);
             const roundPoolBefore = round.pool
@@ -135,7 +135,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeMinusCommisionToBN).toString())
         })
 
-        it("Should play (second) gracefully", async () => {
+        it("player 2 should be able to play second", async () => {
             let round = await program.account.round.fetch(roundPDA);
             const player2BalanceBefore = await program.provider.connection.getBalance(player2.publicKey);
             const roundPoolBefore = round.pool
@@ -173,7 +173,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeMinusCommisionToBN).toString())
         })
 
-        it("Should set player 1 as winner", async () => {
+        it("player 1 should be set as winner when scoring", async () => {
             let round = await program.account.round.fetch(roundPDA);
 
             expect(round.winner.toBase58()).to.be.equal(new anchor.web3.PublicKey(0).toBase58())
@@ -194,7 +194,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             expect(round.score).to.be.equal(player1Score)
         })
 
-        it("Should set player 2 as winner", async () => {
+        it("player 2 should be set as winner when scoring", async () => {
             let round = await program.account.round.fetch(roundPDA);
 
             expect(round.winner.toBase58().toString()).to.be.equal(player1.publicKey.toString())
@@ -215,7 +215,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             expect(round.score).to.be.equal(player2Score)
         })
 
-        it("Shouldn't be able to claim before deadline", async () => {
+        it("anyone shouldn't be able to claim before deadline", async () => {
             try {
                 await program.methods
                     .claim()
@@ -230,7 +230,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Shouldn't be able to play after deadline", async () => {
+        it("anyone shouldn't be able to play after deadline", async () => {
             // waits deadline is reached.
             await setTimeout(ROUND_TIME_IN_SECONDS * 1000 / 2)
 
@@ -244,7 +244,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Shouldn't be able to score after deadline", async () => {
+        it("anyone shouldn't be able to score after deadline", async () => {
             // waits deadline is reached.
             await setTimeout(ROUND_TIME_IN_SECONDS * 1000 / 2)
 
@@ -262,7 +262,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Shouldn't be able to claim if not winner inside grace period", async () => {
+        it("anyone shouldn't be able to claim inside the grace period if they are not the winner", async () => {
             // waits deadline is reached.
             await setTimeout(ROUND_TIME_IN_SECONDS * 1000 / 2)
             try {
@@ -279,7 +279,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Should be able to claim if winner (player 2) inside grace period", async () => {
+        it("winner should be able to claim inside grace period", async () => {
             // waits deadline is reached.
             await setTimeout(ROUND_TIME_IN_SECONDS * 1000 / 2)
 
@@ -314,7 +314,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             expect(player2BalanceAfter.toString()).to.be.equal(player2BalanceBefore.add(roundPoolBefore).toString())
         })
 
-        it("Should be able (admin) to pause game", async () => {
+        it("admin should be able to pause game when game running", async () => {
             let round = await program.account.round.fetch(roundPDA);
             expect(round.paused).to.be.false
 
@@ -329,7 +329,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             expect(round.paused).to.be.true
         })
 
-        it("Shouldn't be able to start another round after game paused", async () => {
+        it("anyone shouldn't be able to start another round when game paused", async () => {
             try {
                 await program.methods
                     .play()
@@ -340,7 +340,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Shouldn't be able (anyone) to resume game", async () => {
+        it("anyone shouldn't be able to resume game", async () => {
             try {
                 await program.methods
                     .resume()
@@ -355,7 +355,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             }
         })
 
-        it("Should be able (admin) to resume game", async () => {
+        it("admin should be able to resume game when game paused", async () => {
             let round = await program.account.round.fetch(roundPDA);
             expect(round.paused).to.be.true
 
