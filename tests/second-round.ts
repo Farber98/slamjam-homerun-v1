@@ -15,7 +15,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
         const CommisionToBN = new BN(COMMISION)
         const FeeMinusCommisionToBN = FeeToBN.sub(CommisionToBN)
 
-        it("Should play (first) gracefully setting deadline after game resumed", async () => {
+        it("player 2 should be able to play setting deadline after game resumed", async () => {
             let round = await program.account.round.fetch(roundPDA);
             const player2BalanceBefore = await program.provider.connection.getBalance(player2.publicKey);
             const roundPoolBefore = round.pool
@@ -60,7 +60,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             expect(roundPoolAfter.toString()).to.be.equal(roundPoolBefore.add(FeeMinusCommisionToBN).toString())
         })
 
-        it("Shouldn't be able (anyone) to pause game", async () => {
+        it("anyone shouldn't be able to pause game", async () => {
             try {
                 await program.methods
                     .pause()
@@ -75,7 +75,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             }
         })
 
-        it("Shouldn't be able (anyone) to kill v1", async () => {
+        it("anyone shouldn't be able to kill", async () => {
             try {
                 await program.methods
                     .kill()
@@ -90,7 +90,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             }
         })
 
-        it("Shouldn't be able (admin) to kill v1 when game not paused", async () => {
+        it("admin shouldn't be able to kill if game is not paused", async () => {
             try {
                 await program.methods
                     .kill()
@@ -103,7 +103,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             }
         })
 
-        it("Should be able (admin) to pause game", async () => {
+        it("admin should be able to pause game when game is not paused", async () => {
             let round = await program.account.round.fetch(roundPDA);
             expect(round.paused).to.be.false
 
@@ -118,7 +118,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             expect(round.paused).to.be.true
         })
 
-        it("Shouldn't be able to pause paused game", async () => {
+        it("anyone shouldn't be able to pause game when game is paused", async () => {
             try {
                 await program.methods
                     .pause()
@@ -131,7 +131,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             }
         })
 
-        it("Shouldn't be able (admin) to kill v1 when pool not empty", async () => {
+        it("admin shouldn't be able to kill when pool is not empty", async () => {
             try {
                 await program.methods
                     .kill()
@@ -144,7 +144,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             }
         })
 
-        it("Should be able to claim if not winner (player 1) after grace period", async () => {
+        it("anyone should be able to claim after grace period", async () => {
             // waits deadline is reached.
             await setTimeout(2 * (ROUND_TIME_IN_SECONDS + 1) * 1000)
 
@@ -180,7 +180,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             expect(player1BalanceAfter.toString()).to.be.equal(player1BalanceBefore.add(roundPoolBefore).toString())
         })
 
-        it("Shouldn't be able to start another round after game paused", async () => {
+        it("anyone shouldn't be able to start another round when game paused", async () => {
             try {
                 await program.methods
                     .play()
@@ -191,7 +191,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             }
         })
 
-        it("Should be able (admin) to kill v1 when paused and pool empty", async () => {
+        it("admin should be able to kill when game is paused and pool is empty", async () => {
             const balanceBefore = await program.provider.connection.getBalance(provider.wallet.publicKey);
             let round = await program.account.round.fetch(roundPDA);
             let commision = round.commision
@@ -207,7 +207,7 @@ export function SecondRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA:
             expect(balanceAfter).to.be.gte(balanceBefore + commision.toNumber())
         })
 
-        it("Shouldn't exist a Round after calling kill", async () => {
+        it("shouldn't exist a round after calling kill", async () => {
             try {
                 await program.account.round.fetch(roundPDA);
             } catch (error) {

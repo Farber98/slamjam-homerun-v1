@@ -314,7 +314,7 @@ export function FirstRound(program: anchor.Program<SlamjamHomerunV1>, roundPDA: 
             expect(player2BalanceAfter.toString()).to.be.equal(player2BalanceBefore.add(roundPoolBefore).toString())
         })
 
-        it("admin should be able to pause game when game running", async () => {
+        it("admin should be able to pause game when game is not paused", async () => {
             let round = await program.account.round.fetch(roundPDA);
             expect(round.paused).to.be.false
 
