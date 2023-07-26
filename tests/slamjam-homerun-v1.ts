@@ -13,8 +13,9 @@ import { SecondRound } from "./second-round";
 
 
 describe("slamjam-homerun-v1 test suite", () => {
-  // TODO: Make sort of config setup
-  // TODO: Make test standar [who] [able|unable] to do something [given certain condition]
+  //Make test standar [who] [able|unable] to do something [given certain condition]
+
+  // Constants and configurations:
 
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env()
@@ -44,6 +45,7 @@ describe("slamjam-homerun-v1 test suite", () => {
   const COMMISION = FEE / 10; // 0.1 SOL
   const ROUND_TIME_IN_SECONDS = /* 3600 */ 4;
 
+  // Test suites
   beforeInitialization(program, roundPDA)
 
   Initialization(program, roundPDA, provider)

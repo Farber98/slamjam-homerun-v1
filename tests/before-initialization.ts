@@ -5,7 +5,7 @@ import { SlamjamHomerunV1 } from "../target/types/slamjam_homerun_v1";
 export function beforeInitialization(program: anchor.Program<SlamjamHomerunV1>, roundPDA: anchor.web3.PublicKey) {
     return describe("Before initialization", () => {
 
-        it("Shouldn't exist a round before calling Initialize", async () => {
+        it("shouldn't exist a round before calling initialize", async () => {
             try {
                 await program.account.round.fetch(roundPDA);
             } catch (error) {
@@ -13,7 +13,7 @@ export function beforeInitialization(program: anchor.Program<SlamjamHomerunV1>, 
             }
         })
 
-        it("Shouldn't be able to play before calling Initialize", async () => {
+        it("anyone shouldn't be able to play before calling initialize", async () => {
             try {
                 await program.methods
                     .play()
@@ -24,7 +24,7 @@ export function beforeInitialization(program: anchor.Program<SlamjamHomerunV1>, 
             }
         })
 
-        it("Shouldn't be able to score before calling Initialize", async () => {
+        it("anyone shouldn't be able to score before calling initialize", async () => {
             try {
                 await program.methods
                     .score(1)
@@ -35,7 +35,7 @@ export function beforeInitialization(program: anchor.Program<SlamjamHomerunV1>, 
             }
         })
 
-        it("Shouldn't be able to claim before calling Initialize", async () => {
+        it("anyone shouldn't be able to claim before calling initialize", async () => {
             try {
                 await program.methods
                     .claim()
@@ -46,7 +46,7 @@ export function beforeInitialization(program: anchor.Program<SlamjamHomerunV1>, 
             }
         })
 
-        it("Shouldn't be able to pause before calling Initialize", async () => {
+        it("anyone shouldn't be able to pause before calling initialize", async () => {
             try {
                 await program.methods
                     .pause()
@@ -57,7 +57,7 @@ export function beforeInitialization(program: anchor.Program<SlamjamHomerunV1>, 
             }
         })
 
-        it("Shouldn't be able to resume before calling Initialize", async () => {
+        it("anyone shouldn't be able to resume before calling initialize", async () => {
             try {
                 await program.methods
                     .resume()
@@ -68,7 +68,7 @@ export function beforeInitialization(program: anchor.Program<SlamjamHomerunV1>, 
             }
         })
 
-        it("Shouldn't be able to profit before calling Initialize", async () => {
+        it("anyone shouldn't be able to profit before calling initialize", async () => {
             try {
                 await program.methods
                     .profit()
@@ -79,7 +79,7 @@ export function beforeInitialization(program: anchor.Program<SlamjamHomerunV1>, 
             }
         })
 
-        it("Shouldn't be able to kill before calling Initialize", async () => {
+        it("anyone shouldn't be able to kill before calling initialize", async () => {
             try {
                 await program.methods
                     .kill()

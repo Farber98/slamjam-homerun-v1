@@ -7,6 +7,7 @@ const FEE: u64 = 1 * LAMPORTS_PER_SOL; // 1 SOL
 const COMMISION: u64 = FEE / 10; // 0.1 SOL
 const ROUND_TIME_IN_SECONDS: i64 = /* 3600 */ 4;
 
+// TODO: Feature flags for tests and maybe for adm wall.
 #[program]
 pub mod slamjam_homerun_v1 {
 
