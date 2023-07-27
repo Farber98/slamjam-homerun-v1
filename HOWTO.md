@@ -25,3 +25,7 @@
 6. Run tests with local validator
     ```shell
     anchor test --skip-local-validator
+
+7. Run tests in testing environment 
+    ```shell
+    anchor test -- --features "testing" 
