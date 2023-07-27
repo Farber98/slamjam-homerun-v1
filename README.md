@@ -16,37 +16,43 @@ Contains all the blockchain side logic for Slamjam Homerun v1.
 
 Install deps
 
-    ```shell
+```shell
     yarn install
+```
 
 Build project
 
-    ```shell
+```shell
     anchor build
-
+```
 
 ## Useful commands for testing
-
 See anchor keys and look for the programID output
-    ```shell
+```shell
     anchor keys list
+```
 
 Run tests
-    ```shell
+```shell
     anchor test
+```
 
 Run local validator
-    ```shell
+```shell
     solana-test-validator
+```
 
 See solana logs
-    ```shell
+```shell
     solana logs --url localhost
+```
 
 Run tests with local validator
-    ```shell
+```shell
     anchor test --skip-local-validator
+```
 
 Run tests in testing environment 
-    ```shell
+```shell
     anchor test -- --features "testing" 
+```
