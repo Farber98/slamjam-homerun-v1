@@ -2,6 +2,8 @@
 
 Contains all the blockchain side logic for Slamjam Homerun v1.
 
+In a nutshell, the game is a baseball strike game where you have fixed rounds and a pot to claim. You pay a fee for entering the game, and that fee goes to the pot. When the round finishes, the user that got the highest score will be able to claim the pot through a grace period. Once the grace ends, anyone will be able to claim. 
+
 
 ## Program structure
 
